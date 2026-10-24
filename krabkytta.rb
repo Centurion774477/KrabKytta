@@ -56,6 +56,60 @@ class Krabkytta
       unless content.match? naming_scheme
         problems << "Line #{line_number} does not match the naming scheme #{name_scheme_word}"
       end
+
+      # more than one expression on one line:
+      # val foo: I32 = “bar”; print(foo);
+      # The preferred approach is splitting that into two lines:
+      # val foo: I32 = “bar”;
+      # print(foo);
+      if content.match?(/;.*;/)
+        problems << "Line #{line_number} has two or more expressions on one line."
+      end
+
+      # avoid using the not operator (!) in while conditions:
+      # while !hungry { ... }
+      # There are two solutions to this:
+      # 1. refactor into a repeat loop:
+      # repeat { ... } until hungry
+      # 2. change the variable name, preferably into the inverse.
+      # For example, hungry -> full; tired -> energetic
+      # while full { ... }
+      if content.match?(/while !/)
+        problems << <<-PROBLEM
+        Line #{line_number} has a while loop with a negated condition.
+        The preferred way to write this is to either use a repeat loop or to invert the variable name.
+
+        Instead of:
+        while !full { ... }
+
+        You should write:
+        repeat { ... } until full
+
+        Or, you can invert the variable name:
+        full turns into hungry
+
+        while hungry { ... }
+        PROBLEM
+      end
+
+      # this handles the opposite case — where they write repeat { ... } until !full
+      if content.match?(/until !/)
+        problems << <<-PROBLEM
+        Line #{line_number} has a repeat loop with a negated condition.
+        The preferred way to write this is to either use a while loop or to invert the variable name.
+
+        Instead of:
+        repeat { ... } until !hungry
+
+        You should write:
+        while hungry { ... }
+
+        Or, you can invert the variable name:
+        hungry turns into full
+
+        repeat { ... } until full
+        PROBLEM
+      end
     end
 
     if problems.empty?
