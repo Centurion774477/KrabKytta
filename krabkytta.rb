@@ -113,6 +113,7 @@ class Krabkytta
     end
 
     problems = check_when_blocks(file, problems)
+    problems = check_var_usage(file, problems)
 
     if problems.empty?
       puts 'No problems were found in this file. Good work.'
@@ -124,7 +125,6 @@ class Krabkytta
   private
 
   # check for when blocks with only one condition
-  # return nil if no problems are found, otherwise returns a string.
   def self.check_when_blocks(file, problems)
     lines             = []
     inside_when_block = false
@@ -151,6 +151,44 @@ class Krabkytta
     problems
   end
 
+  # This checks if you create variables using "var" and then don't reassign them.
+  # In those cases, val should be used.
+  def self.check_var_usage(file, problems)
+    lines      = File.readlines(file)
+    # name => line number where it was declared
+    variables  = {}
+    reassigned = []
+
+    lines.each_with_index do |line, index|
+      line_number = index + 1
+
+      # var foo = ...
+      declared = line.scan(/\bvar\s+(\w+)/).flatten
+      declared.each { |name| variables[name] = line_number }
+
+      # foo = ..., foo += ..., but not foo == / <= / >=,
+      # and not the var declaration itself
+      line.scan(/\b(\w+)\s*(?:\+|-|\*|\/)?=(?!=)/).flatten.each do |name|
+        reassigned << name unless declared.include?(name)
+      end
+    end
+
+    reassigned = reassigned.flatten.uniq
+
+    variables.each do |name, line_number|
+      next if reassigned.include? name
+
+      problems << <<~PROBLEM
+        On line #{line_number} you created #{name} using var but never reassigned it.
+        var (mutable variables) should only be used when you need to reassign a variable.
+
+        I suggest you use val to create this variable instead.
+      PROBLEM
+    end
+
+    problems
+  end
+
   def self.read_yaml
     YAML.load_file 'krabkytta.yaml'
   end
@@ -170,5 +208,10 @@ file = ARGV[0]
 
 abort 'Please pass a file to check' unless file
 
-Krabkytta.check file
+begin
+  Krabkytta.check file
+rescue StandardError
+  # The most likely reason for KrabKytta to break is a malformed config file
+  abort 'An error occured. Please ensure your krabkytta.yaml file is in order'
+end
 
