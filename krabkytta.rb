@@ -118,7 +118,7 @@ class Krabkytta
     if problems.empty?
       puts 'No problems were found in this file. Good work.'
     else
-      problems.each { |problem| puts problem }
+      problems.each { |problem| puts "#{problem}\n" }
     end
   end
 
