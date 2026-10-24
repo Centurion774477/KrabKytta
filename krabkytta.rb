@@ -112,6 +112,8 @@ class Krabkytta
       end
     end
 
+    problems = check_when_blocks(file, problems)
+
     if problems.empty?
       puts 'No problems were found in this file. Good work.'
     else
@@ -120,6 +122,34 @@ class Krabkytta
   end
 
   private
+
+  # check for when blocks with only one condition
+  # return nil if no problems are found, otherwise returns a string.
+  def self.check_when_blocks(file, problems)
+    lines             = []
+    inside_when_block = false
+
+    File.readlines(file).each_with_index do |line, index|
+      if line.match?(/^\s*when\b/)
+        inside_when_block = true
+      elsif line.include?('}') && inside_when_block
+        inside_when_block = false
+
+        if lines.count == 1
+          problems << <<~PROBLEM
+            At around line #{index + 1} there is a when block with only one line.
+            It's advised to convert this into a regular if statement.
+          PROBLEM
+        end
+
+        lines.clear
+      elsif inside_when_block
+        lines << line
+      end
+    end
+
+    problems
+  end
 
   def self.read_yaml
     YAML.load_file 'krabkytta.yaml'
