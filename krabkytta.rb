@@ -9,12 +9,6 @@ require 'yaml'
 class Krabkytta
   # checks for all the simple things: line length, deprecated keywords, etc.
   def self.check file
-    config_path = 'krabkytta.yaml'
-
-    unless File.exist? config_path
-      abort 'No config file exists. Please write a krabkytta.yaml file'
-    end
-
     unless file && File.exist?(file)
       abort 'The file you passed does not exist'
     end
@@ -23,29 +17,47 @@ class Krabkytta
       abort 'The file you passed is empty. Please pass a file with content'
     end
 
-    config = read_yaml
+    config_path = 'krabkytta.yaml'
 
-    ['lines cant be over', 'variable name scheme is', 'deprecated words or symbols'].each do |key|
-      abort "#{key} is missing in krabkytta.yaml" unless config[key]
+    # So fucking ironic
+    # default values if no config is supplied so I don't have to change the foreach block
+    $character_limit   = 120
+    $name_scheme_word  = 'snake_case'
+    $deprecated_values = []
+    $naming_scheme = regexify_naming_scheme $name_scheme_word
+
+    # allow the user to omit a config file
+    # I decided to do this because you can get a lot of insight even without using the config file
+    if File.exist? config_path
+      config = read_yaml
+
+      ['lines cant be over', 'variable name scheme is', 'deprecated words or symbols'].each do |key|
+        abort "#{key} is missing in krabkytta.yaml" unless config[key]
+      end
+
+      $character_limit   = config['lines cant be over']
+      $name_scheme_word  = config['variable name scheme is']
+      $deprecated_values = config['deprecated words or symbols']
+
+      $character_limit = $character_limit.gsub("characters", "").to_i
+      $naming_scheme = regexify_naming_scheme $name_scheme_word
+
+    else
+      puts 'No config file exists.'
+      puts 'This test will be ran using the default values — for example, the maximum line length will be 80 characters.'
+      puts "To check for things like line length, you'll need to write a config file titled #{config_path}\n\n\n"
     end
-
-    character_limit   = config['lines cant be over']
-    name_scheme_word  = config['variable name scheme is']
-    deprecated_values = config['deprecated words or symbols']
-
-    character_limit = character_limit.gsub("characters", "").to_i
-    naming_scheme = regexify_naming_scheme name_scheme_word
 
     problems = []
     File.readlines(file).each_with_index do |line, index|
       line_number = index + 1
       content     = line.chomp
 
-      if content.length > character_limit
-        problems << "Line #{line_number} has #{content.length} characters which is over the limit of #{character_limit} characters"
+      if content.length > $character_limit
+        problems << "Line #{line_number} has #{content.length} characters which is over the limit of #{$character_limit} characters"
       end
 
-      if (deprecated = deprecated_values.find { |word| content.include? word })
+      if (deprecated = $deprecated_values.find { |word| content.include? word })
         problems << "Line #{line_number} contains #{deprecated}; usage of such a value is deprecated."
       end
 
@@ -54,8 +66,8 @@ class Krabkytta
       # Right now it will throw a lot of false negatives
       next if content.strip.empty? # don't flag blank lines
 
-      unless content.match? naming_scheme
-        problems << "Line #{line_number} does not match the naming scheme #{name_scheme_word}"
+      unless content.match? $naming_scheme
+        problems << "Line #{line_number} does not match the naming scheme #{$name_scheme_word}"
       end
 
       # more than one expression on one line:
@@ -227,8 +239,9 @@ abort 'Please pass a file to check' unless file
 
 begin
   Krabkytta.check file
-rescue StandardError
+rescue StandardError => error
   # The most likely reason for KrabKytta to break is a malformed config file
+  puts error.message
   abort 'An error occured. Please ensure your krabkytta.yaml file is in order'
 end
 
