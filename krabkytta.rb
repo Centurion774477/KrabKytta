@@ -7,6 +7,7 @@ require 'yaml'
 
 # the main engine for Krabkytta
 class Krabkytta
+  # checks for all the simple things: line length, deprecated keywords, etc.
   def self.check file
     config_path = 'krabkytta.yaml'
 
@@ -108,6 +109,22 @@ class Krabkytta
         hungry turns into full
 
         repeat { ... } until full
+        PROBLEM
+      end
+
+      # declaring variables without assigning a value
+      if content.match?(/^\s*(?:val|var)\s+[A-Za-z_]\w*\s*(?::\s*[\w\[\]]+)?\s*$/)
+        problems << <<-PROBLEM
+        Line #{line_number} initializes a variable without assigning a value.
+        The preferred way to do this is to provide some sort of default value.
+
+        For example:
+        val increment: I32 = 0
+        val name: Str = ""
+
+        Both of those are preferred over:
+        val increment: I32
+        val name: Str
         PROBLEM
       end
     end
